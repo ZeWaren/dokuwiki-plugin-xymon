@@ -1,0 +1,14 @@
+Xymon monitoring for Dokuwiki.
+
+This dokuwiki plugin + xymon script allow a xymon server to monitor a dokuwiki installation
+
+Author:
+Erwan Martin <public@fzwte.net>
+
+License:
+-GPLv2 for the dokuwiki plugin since it's a copyleft license 
+-Public Domain for all the other parts
+
+More information on the plugin webpage:
+http://www.dokuwiki.org/plugin:xymon
+
