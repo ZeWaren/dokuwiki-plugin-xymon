@@ -5,7 +5,7 @@
 # Require the associated plugin to be installed on the target wikis
 # Erwan Martin <public@fzwte.net>
 #
-# Runs on FreeBSD
+# Runs on FreeBSD and certainly elsewhere since it's ruby
 #
 # License: Public Domain
 #
@@ -67,7 +67,22 @@ end
 
 #we need to be able to set param to the http client of the ruby xmlrpc client
 module SELF_SSL
+	class Net_HTTP < Net::HTTP
+		def set_sslcontext(value)
+			@ssl_context = value
+		end
+	end
+
   class XMLRPC_Client < XMLRPC::Client
+    def initialize(*args)
+      super
+      @http = SELF_SSL::Net_HTTP.new( @host, @port,
+                                      @proxy_host,@proxy_port )
+      @http.use_ssl = @use_ssl if @use_ssl
+      @http.read_timeout = @timeout
+      @http.open_timeout = @timeout
+    end
+
     def get_http()
         return @http
     end
@@ -86,25 +101,38 @@ wikis_to_check.each do |wiki_information|
 		server.user = wiki_information[:user]
 		server.password = wiki_information[:password]
 		http=server.get_http()
+		object_to_decorate = http
+		if RUBY_VERSION < "1.9"
+			ssl_context = OpenSSL::SSL::SSLContext.new
+			http.set_sslcontext(ssl_context)
+			object_to_decorate = ssl_context
+		end
 
 		#ssl (if provided)
 		#  the equivalent line is:
 		#  openssl s_client -connect host:port -servername host -cert :sslcert -key :sslkey -verify 12 -CAfile :sslcacert
 		if not wiki_information[:sslcert].empty?
  			certificate = OpenSSL::X509::Certificate.new(File.read(wiki_information[:sslcert]))
-			http.cert = certificate
+			object_to_decorate.cert = certificate
 		end
 		if not wiki_information[:sslkey].empty?
 			key = OpenSSL::PKey::RSA.new(File.read(wiki_information[:sslkey]))
-			http.key=key
+			object_to_decorate.key=key
 		end
 		if not wiki_information[:sslcacert].empty?
-			http.ca_file=wiki_information[:sslcacert]
+			object_to_decorate.ca_file=wiki_information[:sslcacert]
 		end
 		if http.use_ssl?
-			http.verify_mode = OpenSSL::SSL::VERIFY_PEER
-			http.verify_depth = 12
+			object_to_decorate.verify_mode = OpenSSL::SSL::VERIFY_PEER
+			object_to_decorate.verify_depth = 12
 		end
+		##Uncomment this to see the chain verification in details and to override it
+		#object_to_decorate.verify_callback = Proc.new do |ok, store_context|
+		#   puts ok
+		#   puts store_context
+		#   true
+		#end
+
 
 		#call
 		status_page = server.call("wiki.getPage", "xymon:xymonstatus")
